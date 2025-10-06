@@ -1,0 +1,9 @@
+@supports (padding: max(0px)) {
+    :root {
+        --safe-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+body {
+    padding-bottom: max(var(--safe-bottom), 0px);
+}

@@ -1,46 +1,91 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { getTracks } from "../api/musicApi";
+import React, { useEffect } from "react";
+import { Table, List, Typography, Space, Skeleton, Empty, Grid } from "antd";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchTracks } from "../features/tracks/trackSlice";
+import { playTrack } from "../features/player/playerSlice";
 
-// Thunk: fetch all tracks (DTO list)
-export const fetchTracks = createAsyncThunk(
-    "tracks/fetchTracks",
-    async () => {
-        const { data } = await getTracks();
-        return data;
+export default function ResponsiveTrackList() {
+    const dispatch = useDispatch();
+    const { items, status, error } = useSelector((s) => s.tracks);
+    const screens = Grid.useBreakpoint();
+    const isMobile = !screens.md;
+
+    useEffect(() => {
+        if (status === "idle") dispatch(fetchTracks());
+    }, [dispatch, status]);
+
+    if (status === "loading")
+        return <Skeleton active paragraph={{ rows: 6 }} />;
+    if (status === "failed")
+        return <Empty description={error || "Failed to load tracks"} />;
+    if (!items.length) return <Empty description="No tracks found" />;
+
+    if (isMobile) {
+        return (
+            <List
+                dataSource={items}
+                size="large"
+                renderItem={(track, idx) => (
+                    <List.Item
+                        onClick={() => dispatch(playTrack(track))}
+                        style={{ cursor: "pointer", paddingLeft: 8 }}
+                    >
+                        <Space
+                            direction="vertical"
+                            size={0}
+                            style={{ width: "100%" }}
+                        >
+                            <Typography.Text strong ellipsis>
+                                {idx + 1}. {track.title}
+                            </Typography.Text>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                {track.duration} • {track.bitrate} kbps
+                            </Typography.Text>
+                        </Space>
+                    </List.Item>
+                )}
+            />
+        );
     }
-);
 
-const trackSlice = createSlice({
-    name: "tracks",
-    initialState: {
-        items: [],
-        status: "idle", // 'idle' | 'loading' | 'succeeded' | 'failed'
-        error: null
-    },
-    reducers: {
-        // Add synchronous reducers if needed later
-        clearTracks(state) {
-            state.items = [];
-            state.status = "idle";
-            state.error = null;
+    const columns = [
+        {
+            title: "#",
+            dataIndex: "index",
+            width: 60,
+            render: (_, __, i) => i + 1
+        },
+        {
+            title: "Title",
+            dataIndex: "title",
+            render: (text, record) => (
+                <Typography.Link
+                    onClick={() => dispatch(playTrack(record))}
+                >
+                    {text}
+                </Typography.Link>
+            )
+        },
+        {
+            title: "Duration",
+            dataIndex: "duration",
+            width: 120
+        },
+        {
+            title: "Bitrate",
+            dataIndex: "bitrate",
+            width: 100,
+            render: (b) => (b ? `${b} kbps` : "")
         }
-    },
-    extraReducers: (builder) => {
-        builder
-            .addCase(fetchTracks.pending, (state) => {
-                state.status = "loading";
-                state.error = null;
-            })
-            .addCase(fetchTracks.fulfilled, (state, action) => {
-                state.status = "succeeded";
-                state.items = action.payload || [];
-            })
-            .addCase(fetchTracks.rejected, (state, action) => {
-                state.status = "failed";
-                state.error = action.error?.message || "Failed to load tracks";
-            });
-    }
-});
+    ];
 
-export const { clearTracks } = trackSlice.actions;
-export default trackSlice.reducer;
+    return (
+        <Table
+            rowKey="fileHash"
+            dataSource={items}
+            columns={columns}
+            pagination={false}
+            size="middle"
+        />
+    );
+}

@@ -489,7 +489,7 @@ export default function ResponsiveSearch() {
             </Space>
 
             <Tabs
-                destroyOnHidden
+                destroyInactiveTabPane
                 defaultActiveKey="tracks"
                 items={[
                     {
@@ -499,7 +499,9 @@ export default function ResponsiveSearch() {
                     },
                     {
                         key: "albums",
-                        label: selectedAlbum ? `Album: ${selectedAlbum.name}` : "Albums",
+                        label: selectedAlbum
+                            ? `Album: ${selectedAlbum.name}`
+                            : "Albums",
                         children: renderAlbums()
                     }
                 ]}

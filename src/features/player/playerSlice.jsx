@@ -1,187 +1,128 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+/**
+ * Player slice manages:
+ * - Current track DTO
+ * - Queue (array of TrackDTO)
+ * - currentIndex within queue
+ * - isPlaying
+ * - shuffle mode
+ */
 const initialState = {
     track: null,
-    isPlaying: false,
-    trackCollection: [],
+    queue: [],
     currentIndex: -1,
-    shuffle: false,
-    history: [],
-    shufflePool: []
+    isPlaying: false,
+    shuffle: false
 };
 
 const playerSlice = createSlice({
     name: "player",
     initialState,
     reducers: {
-        setTrackCollection(state, action) {
-            const tracks = action.payload || [];
-            state.trackCollection = tracks;
-
-            if (state.shuffle) {
-                const currentHash = state.track?.fileHash;
-                state.shufflePool = tracks
-                    .filter(t => t.fileHash !== currentHash)
-                    .map(t => t.fileHash);
-                if (
-                    currentHash &&
-                    !tracks.some(t => t.fileHash === currentHash)
-                ) {
-                    state.history = [];
-                    state.track = null;
-                    state.currentIndex = -1;
-                    state.isPlaying = false;
-                }
-            } else if (state.track) {
-                const idx = tracks.findIndex(
-                    t => t.fileHash === state.track.fileHash
-                );
-                state.currentIndex = idx;
-            } else {
-                state.currentIndex = -1;
-            }
+        setQueue(state, action) {
+            const { tracks, startFileHash } = action.payload;
+            state.queue = tracks || [];
+            const idx = tracks.findIndex(t => t.fileHash === startFileHash);
+            state.currentIndex = idx >= 0 ? idx : 0;
+            state.track = state.queue[state.currentIndex] || null;
+            state.isPlaying = Boolean(state.track);
         },
         playTrack(state, action) {
             const track = action.payload;
-            state.track = track;
-            state.isPlaying = true;
-            const idx = state.trackCollection.findIndex(
-                t => t.fileHash === track.fileHash
-            );
-            state.currentIndex = idx;
-
+            if (track) {
+                // If track not in queue, append and set index
+                const existingIndex = state.queue.findIndex(t => t.fileHash === track.fileHash);
+                if (existingIndex === -1) {
+                    state.queue.push(track);
+                    state.currentIndex = state.queue.length - 1;
+                } else {
+                    state.currentIndex = existingIndex;
+                }
+                state.track = track;
+                state.isPlaying = true;
+            }
+        },
+        playByIndex(state, action) {
+            const idx = action.payload;
+            if (idx >= 0 && idx < state.queue.length) {
+                state.currentIndex = idx;
+                state.track = state.queue[idx];
+                state.isPlaying = true;
+            }
+        },
+        playNext(state) {
+            if (!state.queue.length) return;
             if (state.shuffle) {
-                if (
-                    !state.history.length ||
-                    state.history[state.history.length - 1] !== track.fileHash
-                ) {
-                    state.history.push(track.fileHash);
+                if (state.queue.length === 1) {
+                    // Only one item, replay it
+                    state.isPlaying = true;
+                    return;
                 }
-                state.shufflePool = state.shufflePool.filter(
-                    fh => fh !== track.fileHash
-                );
-                if (state.shufflePool.length === 0 && state.trackCollection.length > 1) {
-                    state.shufflePool = state.trackCollection
-                        .filter(t => t.fileHash !== track.fileHash)
-                        .map(t => t.fileHash);
-                    state.history = [track.fileHash];
+                let nextIndex = state.currentIndex;
+                // ensure different track
+                for (let safety = 0; safety < 10 && nextIndex === state.currentIndex; safety++) {
+                    nextIndex = Math.floor(Math.random() * state.queue.length);
                 }
+                state.currentIndex = nextIndex;
+                state.track = state.queue[nextIndex];
+                state.isPlaying = true;
             } else {
-                if (
-                    !state.history.length ||
-                    state.history[state.history.length - 1] !== track.fileHash
-                ) {
-                    state.history.push(track.fileHash);
+                const nextIndex = state.currentIndex + 1;
+                if (nextIndex < state.queue.length) {
+                    state.currentIndex = nextIndex;
+                    state.track = state.queue[nextIndex];
+                    state.isPlaying = true;
+                } else {
+                    // Reached end: stop (can change to loop if you prefer)
+                    state.isPlaying = false;
+                }
+            }
+        },
+        playPrev(state) {
+            if (!state.queue.length) return;
+            if (state.shuffle) {
+                // Random previous when shuffle (acts like next random selection)
+                if (state.queue.length === 1) return;
+                let prevIndex = state.currentIndex;
+                for (let safety = 0; safety < 10 && prevIndex === state.currentIndex; safety++) {
+                    prevIndex = Math.floor(Math.random() * state.queue.length);
+                }
+                state.currentIndex = prevIndex;
+                state.track = state.queue[prevIndex];
+                state.isPlaying = true;
+            } else {
+                const prevIndex = state.currentIndex - 1;
+                if (prevIndex >= 0) {
+                    state.currentIndex = prevIndex;
+                    state.track = state.queue[prevIndex];
+                    state.isPlaying = true;
+                } else {
+                    // At start: do nothing (could wrap if desired)
                 }
             }
         },
         pauseTrack(state) {
             state.isPlaying = false;
         },
-        resumeTrack(state) {
-            if (state.track) state.isPlaying = true;
-        },
         toggleShuffle(state) {
             state.shuffle = !state.shuffle;
-            if (state.shuffle) {
-                const currentHash = state.track?.fileHash;
-                state.shufflePool = state.trackCollection
-                    .filter(t => t.fileHash !== currentHash)
-                    .map(t => t.fileHash);
-                state.history = currentHash ? [currentHash] : [];
-            } else {
-                if (state.track) {
-                    state.currentIndex = state.trackCollection.findIndex(
-                        t => t.fileHash === state.track.fileHash
-                    );
-                } else {
-                    state.currentIndex = -1;
-                }
-                state.shufflePool = [];
-            }
         },
-        nextTrack(state) {
-            if (!state.trackCollection.length) return;
-            if (state.shuffle) {
-                if (state.shufflePool.length === 0) {
-                    const currentHash = state.track?.fileHash;
-                    state.shufflePool = state.trackCollection
-                        .filter(t => t.fileHash !== currentHash)
-                        .map(t => t.fileHash);
-                    state.history = currentHash ? [currentHash] : [];
-                }
-                const randIdx = Math.floor(Math.random() * state.shufflePool.length);
-                const nextHash = state.shufflePool[randIdx];
-                state.shufflePool.splice(randIdx, 1);
-                const nextTrack = state.trackCollection.find(
-                    t => t.fileHash === nextHash
-                );
-                if (nextTrack) {
-                    state.track = nextTrack;
-                    state.isPlaying = true;
-                    state.history.push(nextHash);
-                    state.currentIndex = state.trackCollection.findIndex(
-                        t => t.fileHash === nextHash
-                    );
-                }
-            } else {
-                if (state.currentIndex < 0) state.currentIndex = 0;
-                else
-                    state.currentIndex =
-                        (state.currentIndex + 1) % state.trackCollection.length;
-                const nextTrack = state.trackCollection[state.currentIndex];
-                if (nextTrack) {
-                    state.track = nextTrack;
-                    state.isPlaying = true;
-                    state.history.push(nextTrack.fileHash);
-                }
-            }
-        },
-        prevTrack(state) {
-            if (!state.trackCollection.length || !state.track) return;
-            if (state.shuffle) {
-                if (state.history.length > 1) {
-                    state.history.pop();
-                    const prevHash =
-                        state.history[state.history.length - 1];
-                    const prevTrack = state.trackCollection.find(
-                        t => t.fileHash === prevHash
-                    );
-                    if (prevTrack) {
-                        state.track = prevTrack;
-                        state.isPlaying = true;
-                        state.currentIndex = state.trackCollection.findIndex(
-                            t => t.fileHash === prevHash
-                        );
-                        const visited = new Set(state.history);
-                        state.shufflePool = state.trackCollection
-                            .filter(t => !visited.has(t.fileHash))
-                            .map(t => t.fileHash);
-                    }
-                }
-            } else {
-                if (state.currentIndex <= 0)
-                    state.currentIndex = state.trackCollection.length - 1;
-                else state.currentIndex -= 1;
-                const prevTrack = state.trackCollection[state.currentIndex];
-                if (prevTrack) {
-                    state.track = prevTrack;
-                    state.isPlaying = true;
-                    state.history.push(prevTrack.fileHash);
-                }
-            }
+        clearPlayer(state) {
+            Object.assign(state, initialState);
         }
     }
 });
 
 export const {
-    setTrackCollection,
+    setQueue,
     playTrack,
+    playByIndex,
+    playNext,
+    playPrev,
     pauseTrack,
-    resumeTrack,
     toggleShuffle,
-    nextTrack,
-    prevTrack
+    clearPlayer
 } = playerSlice.actions;
 
 export default playerSlice.reducer;

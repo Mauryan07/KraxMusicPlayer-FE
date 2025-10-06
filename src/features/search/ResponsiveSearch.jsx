@@ -23,7 +23,7 @@ import {
     setQuery,
     clearSearch
 } from "./searchSlice";
-import { playTrack } from "../player/playerSlice";
+import { playTrack, setQueue } from "../player/playerSlice";
 import { LeftOutlined, PlayCircleOutlined } from "@ant-design/icons";
 
 const Artwork = ({ album, size = 120, radius = 14 }) => {
@@ -176,7 +176,15 @@ export default function ResponsiveSearch() {
                                     cursor: "pointer",
                                     paddingLeft: isMobile ? 8 : 16
                                 }}
-                                onClick={() => dispatch(playTrack(track))}
+                                onClick={() => {
+                                    dispatch(
+                                        setQueue({
+                                            tracks: selectedAlbum.tracks,
+                                            startFileHash: track.fileHash
+                                        })
+                                    );
+                                    dispatch(playTrack(track));
+                                }}
                             >
                                 <Space
                                     direction="vertical"
@@ -194,6 +202,13 @@ export default function ResponsiveSearch() {
                                                 <Typography.Link
                                                     onClick={(e) => {
                                                         e.preventDefault();
+                                                        dispatch(
+                                                            setQueue({
+                                                                tracks: selectedAlbum.tracks,
+                                                                startFileHash:
+                                                                track.fileHash
+                                                            })
+                                                        );
                                                         dispatch(playTrack(track));
                                                     }}
                                                     style={{
@@ -236,6 +251,12 @@ export default function ResponsiveSearch() {
                                     }
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        dispatch(
+                                            setQueue({
+                                                tracks: selectedAlbum.tracks,
+                                                startFileHash: track.fileHash
+                                            })
+                                        );
                                         dispatch(playTrack(track));
                                     }}
                                 />
@@ -247,7 +268,6 @@ export default function ResponsiveSearch() {
         </Card>
     );
 
-    /* ---------- Tracks Tab Content ---------- */
     const renderTracks = () => {
         if (loadingTracks)
             return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -263,7 +283,15 @@ export default function ResponsiveSearch() {
                     size="large"
                     renderItem={(track, idx) => (
                         <List.Item
-                            onClick={() => dispatch(playTrack(track))}
+                            onClick={() => {
+                                dispatch(
+                                    setQueue({
+                                        tracks: trackResults,
+                                        startFileHash: track.fileHash
+                                    })
+                                );
+                                dispatch(playTrack(track));
+                            }}
                             style={{ cursor: "pointer", paddingLeft: 8 }}
                         >
                             <Space
@@ -302,7 +330,15 @@ export default function ResponsiveSearch() {
                             cursor: "pointer",
                             paddingLeft: 12
                         }}
-                        onClick={() => dispatch(playTrack(track))}
+                        onClick={() => {
+                            dispatch(
+                                setQueue({
+                                    tracks: trackResults,
+                                    startFileHash: track.fileHash
+                                })
+                            );
+                            dispatch(playTrack(track));
+                        }}
                     >
                         <Space
                             direction="vertical"
@@ -321,6 +357,12 @@ export default function ResponsiveSearch() {
                                     <Typography.Link
                                         onClick={(e) => {
                                             e.preventDefault();
+                                            dispatch(
+                                                setQueue({
+                                                    tracks: trackResults,
+                                                    startFileHash: track.fileHash
+                                                })
+                                            );
                                             dispatch(playTrack(track));
                                         }}
                                         style={{ fontWeight: 500 }}
@@ -354,7 +396,6 @@ export default function ResponsiveSearch() {
         );
     };
 
-    /* ---------- Albums Tab Content ---------- */
     const renderAlbums = () => {
         if (selectedAlbum) return albumDrill;
         if (loadingAlbums)

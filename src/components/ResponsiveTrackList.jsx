@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Table, List, Typography, Space, Skeleton, Empty, Grid } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTracks } from "../features/tracks/trackSlice";
-import { playTrack } from "../features/player/playerSlice";
+import { playTrack, setQueue } from "../features/player/playerSlice";
 
 export default function ResponsiveTrackList() {
     const dispatch = useDispatch();
@@ -13,6 +13,11 @@ export default function ResponsiveTrackList() {
     useEffect(() => {
         if (status === "idle") dispatch(fetchTracks());
     }, [dispatch, status]);
+
+    const handlePlay = (track) => {
+        dispatch(setQueue({ tracks: items, startFileHash: track.fileHash }));
+        dispatch(playTrack(track));
+    };
 
     if (status === "loading")
         return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -27,7 +32,7 @@ export default function ResponsiveTrackList() {
                 size="large"
                 renderItem={(track, idx) => (
                     <List.Item
-                        onClick={() => dispatch(playTrack(track))}
+                        onClick={() => handlePlay(track)}
                         style={{ cursor: "pointer", paddingLeft: 8 }}
                     >
                         <Space
@@ -60,7 +65,7 @@ export default function ResponsiveTrackList() {
             dataIndex: "title",
             render: (text, record) => (
                 <Typography.Link
-                    onClick={() => dispatch(playTrack(record))}
+                    onClick={() => handlePlay(record)}
                 >
                     {text}
                 </Typography.Link>

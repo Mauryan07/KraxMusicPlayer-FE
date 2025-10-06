@@ -23,25 +23,28 @@ const playerSlice = createSlice({
         setQueue(state, action) {
             const { tracks, startFileHash } = action.payload;
             state.queue = tracks || [];
-            const idx = tracks.findIndex(t => t.fileHash === startFileHash);
+            const idx = (tracks || []).findIndex(t => t.fileHash === startFileHash);
             state.currentIndex = idx >= 0 ? idx : 0;
             state.track = state.queue[state.currentIndex] || null;
             state.isPlaying = Boolean(state.track);
         },
         playTrack(state, action) {
             const track = action.payload;
-            if (track) {
-                // If track not in queue, append and set index
-                const existingIndex = state.queue.findIndex(t => t.fileHash === track.fileHash);
-                if (existingIndex === -1) {
+            if (!track) return;
+            const existingIndex = state.queue.findIndex(t => t.fileHash === track.fileHash);
+            if (existingIndex === -1) {
+                if (!state.queue.length) {
+                    state.queue = [track];
+                    state.currentIndex = 0;
+                } else {
                     state.queue.push(track);
                     state.currentIndex = state.queue.length - 1;
-                } else {
-                    state.currentIndex = existingIndex;
                 }
-                state.track = track;
-                state.isPlaying = true;
+            } else {
+                state.currentIndex = existingIndex;
             }
+            state.track = track;
+            state.isPlaying = true;
         },
         playByIndex(state, action) {
             const idx = action.payload;
@@ -55,51 +58,39 @@ const playerSlice = createSlice({
             if (!state.queue.length) return;
             if (state.shuffle) {
                 if (state.queue.length === 1) {
-                    // Only one item, replay it
                     state.isPlaying = true;
                     return;
                 }
                 let nextIndex = state.currentIndex;
-                // ensure different track
-                for (let safety = 0; safety < 10 && nextIndex === state.currentIndex; safety++) {
+                for (let safety = 0; safety < 16 && nextIndex === state.currentIndex; safety++) {
                     nextIndex = Math.floor(Math.random() * state.queue.length);
                 }
                 state.currentIndex = nextIndex;
                 state.track = state.queue[nextIndex];
                 state.isPlaying = true;
             } else {
-                const nextIndex = state.currentIndex + 1;
-                if (nextIndex < state.queue.length) {
-                    state.currentIndex = nextIndex;
-                    state.track = state.queue[nextIndex];
-                    state.isPlaying = true;
-                } else {
-                    // Reached end: stop (can change to loop if you prefer)
-                    state.isPlaying = false;
-                }
+                const nextIndex = (state.currentIndex + 1) % state.queue.length;
+                state.currentIndex = nextIndex;
+                state.track = state.queue[nextIndex];
+                state.isPlaying = true;
             }
         },
         playPrev(state) {
             if (!state.queue.length) return;
             if (state.shuffle) {
-                // Random previous when shuffle (acts like next random selection)
                 if (state.queue.length === 1) return;
                 let prevIndex = state.currentIndex;
-                for (let safety = 0; safety < 10 && prevIndex === state.currentIndex; safety++) {
+                for (let safety = 0; safety < 16 && prevIndex === state.currentIndex; safety++) {
                     prevIndex = Math.floor(Math.random() * state.queue.length);
                 }
                 state.currentIndex = prevIndex;
                 state.track = state.queue[prevIndex];
                 state.isPlaying = true;
             } else {
-                const prevIndex = state.currentIndex - 1;
-                if (prevIndex >= 0) {
-                    state.currentIndex = prevIndex;
-                    state.track = state.queue[prevIndex];
-                    state.isPlaying = true;
-                } else {
-                    // At start: do nothing (could wrap if desired)
-                }
+                const prevIndex = (state.currentIndex - 1 + state.queue.length) % state.queue.length;
+                state.currentIndex = prevIndex;
+                state.track = state.queue[prevIndex];
+                state.isPlaying = true;
             }
         },
         pauseTrack(state) {

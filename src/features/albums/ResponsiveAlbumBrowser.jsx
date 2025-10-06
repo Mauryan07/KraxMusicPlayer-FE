@@ -16,7 +16,7 @@ import {
 } from "antd";
 import { useSelector, useDispatch } from "react-redux";
 import { fetchAlbums } from "./albumSlice";
-import { playTrack } from "../player/playerSlice";
+import { playTrack, setQueue } from "../player/playerSlice";
 import {
     LeftOutlined,
     PlayCircleOutlined
@@ -85,7 +85,6 @@ export default function ResponsiveAlbumBrowser() {
     const openAlbum = (album) => setSelectedAlbum(album);
     const backToAlbums = () => setSelectedAlbum(null);
 
-    /* ---------- States ---------- */
     if (status === "loading")
         return <Skeleton active paragraph={{ rows: 6 }} />;
     if (status === "failed")
@@ -93,7 +92,6 @@ export default function ResponsiveAlbumBrowser() {
     if (!albums?.length)
         return <Empty description="No albums found" />;
 
-    /* ---------- Album Detail View ---------- */
     if (selectedAlbum) {
         const alb = selectedAlbum;
         return (
@@ -198,7 +196,15 @@ export default function ResponsiveAlbumBrowser() {
                                         cursor: "pointer",
                                         paddingLeft: isMobile ? 8 : 16
                                     }}
-                                    onClick={() => dispatch(playTrack(track))}
+                                    onClick={() => {
+                                        dispatch(
+                                            setQueue({
+                                                tracks: alb.tracks,
+                                                startFileHash: track.fileHash
+                                            })
+                                        );
+                                        dispatch(playTrack(track));
+                                    }}
                                 >
                                     <Space
                                         direction="vertical"
@@ -221,6 +227,13 @@ export default function ResponsiveAlbumBrowser() {
                                                     <Typography.Link
                                                         onClick={(e) => {
                                                             e.preventDefault();
+                                                            dispatch(
+                                                                setQueue({
+                                                                    tracks: alb.tracks,
+                                                                    startFileHash:
+                                                                    track.fileHash
+                                                                })
+                                                            );
                                                             dispatch(playTrack(track));
                                                         }}
                                                         style={{
@@ -264,6 +277,12 @@ export default function ResponsiveAlbumBrowser() {
                                         }
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            dispatch(
+                                                setQueue({
+                                                    tracks: alb.tracks,
+                                                    startFileHash: track.fileHash
+                                                })
+                                            );
                                             dispatch(playTrack(track));
                                         }}
                                     />
@@ -276,7 +295,6 @@ export default function ResponsiveAlbumBrowser() {
         );
     }
 
-    /* ---------- Album Grid / List ---------- */
     if (isMobile) {
         return (
             <List
@@ -325,7 +343,6 @@ export default function ResponsiveAlbumBrowser() {
         );
     }
 
-    // Desktop grid
     return (
         <Row gutter={[28, 32]}>
             {sortedAlbums.map((album) => (

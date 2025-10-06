@@ -10,7 +10,8 @@ import {
     Dropdown,
     Skeleton,
     theme as antdTheme,
-    Flex
+    Flex,
+    Grid
 } from "antd";
 import {
     PlayCircleFilled,
@@ -21,7 +22,10 @@ import {
     AudioMutedOutlined,
     LoadingOutlined,
     RetweetOutlined,
-    RetweetOutlined as ShuffleActiveIcon
+    MinusOutlined,
+    PlusOutlined,
+    ExpandAltOutlined,
+    CompressOutlined
 } from "@ant-design/icons";
 import {
     pauseTrack,
@@ -31,6 +35,8 @@ import {
     toggleShuffle
 } from "../features/player/playerSlice";
 import { getTrackAudioUrl, getTrackArtworkUrl } from "../api/musicApi";
+
+const { useBreakpoint } = Grid;
 
 const formatTime = (secs) => {
     if (isNaN(secs) || secs === Infinity) return "00:00";
@@ -53,7 +59,9 @@ export default function FloatingPlayer() {
         (s) => s.player
     );
 
-    // Always keep hook order stable
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
+
     const audioRef = useRef(null);
     const rafRef = useRef(null);
 
@@ -68,6 +76,10 @@ export default function FloatingPlayer() {
     });
     const [lastNonZeroVolume, setLastNonZeroVolume] = useState(0.85);
     const [isMuted, setIsMuted] = useState(false);
+
+    // New collapse state
+    const [collapsed, setCollapsed] = useState(false);
+    const toggleCollapsed = () => setCollapsed((c) => !c);
 
     const updateTime = useCallback(() => {
         const audio = audioRef.current;
@@ -218,7 +230,6 @@ export default function FloatingPlayer() {
         </div>
     );
 
-    // If no track, render stable empty container (maintains hook order)
     if (!track) {
         return (
             <div
@@ -233,15 +244,247 @@ export default function FloatingPlayer() {
         );
     }
 
+    // Sizes
+    const artworkSize = collapsed ? (isMobile ? 40 : 44) : isMobile ? 56 : 140;
+
+    // Collapsed layout rendering
+    if (collapsed) {
+        return (
+            <Card
+                bordered={false}
+                bodyStyle={{
+                    padding: isMobile ? "6px 10px 6px 56px" : "8px 16px 8px 70px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    background: token.colorBgElevated
+                }}
+                style={{
+                    position: "fixed",
+                    left: 0,
+                    bottom: 0,
+                    width: "100%",
+                    zIndex: 1200,
+                    margin: 0,
+                    borderRadius: 0,
+                    boxShadow:
+                        "0 -4px 18px rgba(0,0,0,0.28), 0 -1px 0 rgba(255,255,255,0.05)"
+                }}
+            >
+                {/* Small Artwork */}
+                <div
+                    style={{
+                        position: "absolute",
+                        left: isMobile ? 8 : 16,
+                        bottom: "50%",
+                        transform: "translateY(50%)",
+                        width: artworkSize,
+                        height: artworkSize,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        boxShadow: "0 4px 12px -4px rgba(0,0,0,0.45)"
+                    }}
+                >
+                    {buffering && !currentTime ? (
+                        <Skeleton.Image
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover"
+                            }}
+                            active
+                        />
+                    ) : (
+                        <img
+                            src={artworkUrl}
+                            alt={track.title}
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover"
+                            }}
+                            onError={(e) => {
+                                e.currentTarget.style.opacity = 0.25;
+                            }}
+                        />
+                    )}
+                </div>
+
+                <Flex
+                    align="center"
+                    justify="space-between"
+                    style={{ gap: 8, flexWrap: "nowrap" }}
+                >
+                    <Space
+                        direction="vertical"
+                        size={0}
+                        style={{
+                            flex: 1,
+                            minWidth: 0,
+                            paddingRight: 4
+                        }}
+                    >
+                        <Typography.Text
+                            ellipsis
+                            style={{
+                                fontSize: isMobile ? 13 : 14,
+                                fontWeight: 600
+                            }}
+                            title={track.title}
+                        >
+                            {track.title}
+                        </Typography.Text>
+                        <Typography.Text
+                            type="secondary"
+                            style={{
+                                fontSize: 11,
+                                opacity: 0.7
+                            }}
+                        >
+                            {queue.length
+                                ? `${currentIndex + 1}/${queue.length}`
+                                : "—"}
+                        </Typography.Text>
+                    </Space>
+
+                    <Space
+                        size={isMobile ? 2 : 6}
+                        style={{ flexShrink: 0, alignItems: "center" }}
+                    >
+                        <Tooltip title="Previous">
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={
+                                    <StepBackwardOutlined
+                                        style={{ fontSize: 16 }}
+                                    />
+                                }
+                                disabled={queue.length <= 1}
+                                onClick={() => dispatch(playPrev())}
+                            />
+                        </Tooltip>
+
+                        <Tooltip title={isPlaying ? "Pause" : "Play"}>
+                            <Button
+                                type="text"
+                                size="small"
+                                onClick={onPlayPause}
+                                icon={
+                                    buffering ? (
+                                        <LoadingOutlined
+                                            style={{ fontSize: 28 }}
+                                        />
+                                    ) : isPlaying ? (
+                                        <PauseCircleFilled
+                                            style={{
+                                                fontSize: 32,
+                                                color: token.colorPrimary
+                                            }}
+                                        />
+                                    ) : (
+                                        <PlayCircleFilled
+                                            style={{
+                                                fontSize: 32,
+                                                color: token.colorPrimary
+                                            }}
+                                        />
+                                    )
+                                }
+                            />
+                        </Tooltip>
+
+                        <Tooltip title="Next">
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={
+                                    <StepForwardOutlined
+                                        style={{ fontSize: 16 }}
+                                    />
+                                }
+                                disabled={queue.length <= 1}
+                                onClick={() => dispatch(playNext())}
+                            />
+                        </Tooltip>
+
+                        <Tooltip
+                            title={
+                                shuffle
+                                    ? "Shuffle On (random)"
+                                    : "Shuffle Off"
+                            }
+                        >
+                            <Button
+                                type="text"
+                                size="small"
+                                onClick={() => dispatch(toggleShuffle())}
+                                icon={
+                                    <RetweetOutlined
+                                        style={{
+                                            fontSize: 18,
+                                            color: shuffle
+                                                ? token.colorPrimary
+                                                : token.colorTextTertiary,
+                                            transform: shuffle
+                                                ? "rotate(25deg)"
+                                                : "none",
+                                            transition: "all .25s ease"
+                                        }}
+                                    />
+                                }
+                            />
+                        </Tooltip>
+
+                        <Tooltip title="Expand Player">
+                            <Button
+                                type="text"
+                                size="small"
+                                onClick={toggleCollapsed}
+                                icon={
+                                    <ExpandAltOutlined
+                                        style={{ fontSize: 18 }}
+                                    />
+                                }
+                            />
+                        </Tooltip>
+                    </Space>
+                </Flex>
+
+                {/* Slim progress bar */}
+                <Slider
+                    style={{ margin: isMobile ? "0 4px" : "2px 0 0" }}
+                    min={0}
+                    max={100}
+                    value={progressPercent}
+                    onChange={handleSeekChange}
+                    onChangeComplete={handleSeekAfter}
+                    tooltip={{ open: false }}
+                />
+
+                <audio
+                    ref={audioRef}
+                    src={audioSrc}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onWaiting={handleWaiting}
+                    onPlaying={handlePlaying}
+                    onEnded={() => dispatch(playNext())}
+                    preload="metadata"
+                />
+            </Card>
+        );
+    }
+
+    // Expanded layout (original richer view, with added collapse toggle)
     return (
         <Card
             bordered={false}
             bodyStyle={{
                 position: "relative",
-                padding: "16px 260px 18px 170px",
+                padding: isMobile ? "8px 12px 10px 72px" : "16px 260px 18px 170px",
                 display: "flex",
                 flexDirection: "column",
-                gap: 10,
+                gap: isMobile ? 6 : 10,
                 background: token.colorBgElevated,
                 backdropFilter: "blur(8px)"
             }}
@@ -257,19 +500,20 @@ export default function FloatingPlayer() {
                     "0 -6px 24px rgba(0,0,0,0.28), 0 -1px 0 rgba(255,255,255,0.05)"
             }}
         >
-            {/* Enlarged Floating Artwork */}
+            {/* Artwork */}
             <div
                 style={{
                     position: "absolute",
-                    left: 28,
-                    bottom: 18,
-                    width: 140,
-                    height: 140,
-                    transform: "translateY(-55%)",
-                    borderRadius: 22,
+                    left: isMobile ? 8 : 28,
+                    bottom: isMobile ? "50%" : 18,
+                    width: artworkSize,
+                    height: artworkSize,
+                    transform: isMobile ? "translateY(50%)" : "translateY(-55%)",
+                    borderRadius: isMobile ? 10 : 22,
                     overflow: "hidden",
-                    boxShadow:
-                        "0 12px 32px -8px rgba(0,0,0,0.55), 0 4px 10px rgba(0,0,0,0.35)",
+                    boxShadow: isMobile
+                        ? "0 4px 12px rgba(0,0,0,0.35)"
+                        : "0 12px 32px -8px rgba(0,0,0,0.55), 0 4px 10px rgba(0,0,0,0.35)",
                     background:
                         "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03))",
                     display: "flex",
@@ -300,28 +544,38 @@ export default function FloatingPlayer() {
                 )}
             </div>
 
-            {/* Top Row */}
             <Flex
                 align="center"
                 justify="space-between"
-                style={{ gap: 32, flexWrap: "wrap" }}
+                style={{
+                    gap: isMobile ? 12 : 32,
+                    flexWrap: "wrap",
+                    paddingLeft: 0
+                }}
             >
                 <Space
                     direction="vertical"
-                    style={{ flex: 1, minWidth: 240 }}
-                    size={4}
+                    style={{ flex: 1, minWidth: isMobile ? 140 : 240 }}
+                    size={isMobile ? 0 : 4}
                 >
                     <Typography.Text
                         strong
                         ellipsis
-                        style={{ fontSize: 18, letterSpacing: 0.4 }}
+                        style={{
+                            fontSize: isMobile ? 14 : 18,
+                            letterSpacing: 0.4,
+                            paddingRight: 4
+                        }}
                         title={track.title}
                     >
                         {track.title}
                     </Typography.Text>
                     <Typography.Text
                         type="secondary"
-                        style={{ fontSize: 13, opacity: 0.65 }}
+                        style={{
+                            fontSize: isMobile ? 11 : 13,
+                            opacity: 0.65
+                        }}
                     >
                         {queue.length
                             ? `Track ${currentIndex + 1} of ${queue.length}`
@@ -331,13 +585,35 @@ export default function FloatingPlayer() {
 
                 <Space
                     align="center"
-                    style={{ flexShrink: 0, gap: 14, marginLeft: "auto" }}
+                    style={{
+                        flexShrink: 0,
+                        gap: isMobile ? 4 : 14,
+                        marginLeft: "auto"
+                    }}
                 >
+                    <Tooltip title="Collapse Player">
+                        <Button
+                            type="text"
+                            size={isMobile ? "small" : "middle"}
+                            onClick={toggleCollapsed}
+                            icon={
+                                <CompressOutlined
+                                    style={{ fontSize: isMobile ? 18 : 20 }}
+                                />
+                            }
+                        />
+                    </Tooltip>
+
                     <Tooltip title="Previous">
                         <Button
                             type="text"
-                            icon={<StepBackwardOutlined style={{ fontSize: 22 }} />}
-                            disabled={queue.length <= 1 || (!shuffle && currentIndex <= 0)}
+                            size={isMobile ? "small" : "middle"}
+                            icon={
+                                <StepBackwardOutlined
+                                    style={{ fontSize: isMobile ? 18 : 22 }}
+                                />
+                            }
+                            disabled={queue.length <= 1}
                             onClick={() => dispatch(playPrev())}
                         />
                     </Tooltip>
@@ -348,14 +624,22 @@ export default function FloatingPlayer() {
                             onClick={onPlayPause}
                             icon={
                                 buffering ? (
-                                    <LoadingOutlined style={{ fontSize: 46 }} />
+                                    <LoadingOutlined
+                                        style={{ fontSize: isMobile ? 34 : 46 }}
+                                    />
                                 ) : isPlaying ? (
                                     <PauseCircleFilled
-                                        style={{ fontSize: 52, color: token.colorPrimary }}
+                                        style={{
+                                            fontSize: isMobile ? 40 : 52,
+                                            color: token.colorPrimary
+                                        }}
                                     />
                                 ) : (
                                     <PlayCircleFilled
-                                        style={{ fontSize: 52, color: token.colorPrimary }}
+                                        style={{
+                                            fontSize: isMobile ? 40 : 52,
+                                            color: token.colorPrimary
+                                        }}
                                     />
                                 )
                             }
@@ -365,11 +649,13 @@ export default function FloatingPlayer() {
                     <Tooltip title="Next">
                         <Button
                             type="text"
-                            icon={<StepForwardOutlined style={{ fontSize: 22 }} />}
-                            disabled={
-                                queue.length <= 1 ||
-                                (!shuffle && currentIndex >= queue.length - 1)
+                            size={isMobile ? "small" : "middle"}
+                            icon={
+                                <StepForwardOutlined
+                                    style={{ fontSize: isMobile ? 18 : 22 }}
+                                />
                             }
+                            disabled={queue.length <= 1}
                             onClick={() => dispatch(playNext())}
                         />
                     </Tooltip>
@@ -379,12 +665,15 @@ export default function FloatingPlayer() {
                     >
                         <Button
                             type="text"
+                            size={isMobile ? "small" : "middle"}
                             onClick={() => dispatch(toggleShuffle())}
                             icon={
                                 <RetweetOutlined
                                     style={{
-                                        fontSize: 24,
-                                        color: shuffle ? token.colorPrimary : token.colorTextTertiary,
+                                        fontSize: isMobile ? 20 : 24,
+                                        color: shuffle
+                                            ? token.colorPrimary
+                                            : token.colorTextTertiary,
                                         transform: shuffle ? "rotate(25deg)" : "none",
                                         transition: "all .25s ease"
                                     }}
@@ -393,42 +682,54 @@ export default function FloatingPlayer() {
                         />
                     </Tooltip>
 
-                    <Dropdown
-                        trigger={["click"]}
-                        dropdownRender={() => volumeNode}
-                        placement="topRight"
-                    >
-                        <Button
-                            type="text"
-                            style={{ marginLeft: 8 }}
-                            icon={
-                                isMuted || volume === 0 ? (
-                                    <AudioMutedOutlined style={{ fontSize: 24 }} />
-                                ) : (
-                                    <SoundOutlined
-                                        style={{
-                                            fontSize: 24,
-                                            color: token.colorPrimary
-                                        }}
-                                    />
-                                )
-                            }
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                toggleMute();
-                            }}
-                        />
-                    </Dropdown>
+                    {!isMobile && (
+                        <Dropdown
+                            trigger={["click"]}
+                            dropdownRender={() => volumeNode}
+                            placement="topRight"
+                        >
+                            <Button
+                                type="text"
+                                style={{ marginLeft: 8 }}
+                                icon={
+                                    isMuted || volume === 0 ? (
+                                        <AudioMutedOutlined
+                                            style={{ fontSize: 24 }}
+                                        />
+                                    ) : (
+                                        <SoundOutlined
+                                            style={{
+                                                fontSize: 24,
+                                                color: token.colorPrimary
+                                            }}
+                                        />
+                                    )
+                                }
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleMute();
+                                }}
+                            />
+                        </Dropdown>
+                    )}
                 </Space>
             </Flex>
 
             {/* Progress */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: isMobile ? 8 : 14,
+                    marginTop: isMobile ? 2 : 0
+                }}
+            >
                 <Typography.Text
                     style={{
-                        width: 54,
+                        width: isMobile ? 42 : 54,
                         textAlign: "right",
-                        fontVariantNumeric: "tabular-nums"
+                        fontVariantNumeric: "tabular-nums",
+                        fontSize: isMobile ? 11 : 12
                     }}
                 >
                     {formatTime(currentTime)}
@@ -441,11 +742,11 @@ export default function FloatingPlayer() {
                     onChange={handleSeekChange}
                     onChangeComplete={handleSeekAfter}
                     tooltip={{
-                        open: hoverTime !== null,
+                        open: hoverTime !== null && !isMobile,
                         formatter: sliderTooltipFormatter
                     }}
                     onMouseMove={(e) => {
-                        if (!effectiveDuration) return;
+                        if (!effectiveDuration || isMobile) return;
                         const rect = e.currentTarget.getBoundingClientRect();
                         const ratio = Math.min(
                             1,
@@ -456,7 +757,11 @@ export default function FloatingPlayer() {
                     onMouseLeave={() => setHoverTime(null)}
                 />
                 <Typography.Text
-                    style={{ width: 54, fontVariantNumeric: "tabular-nums" }}
+                    style={{
+                        width: isMobile ? 42 : 54,
+                        fontVariantNumeric: "tabular-nums",
+                        fontSize: isMobile ? 11 : 12
+                    }}
                 >
                     {formatTime(effectiveDuration)}
                 </Typography.Text>

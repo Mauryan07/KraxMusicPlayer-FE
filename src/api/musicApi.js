@@ -6,8 +6,8 @@ import axios from 'axios';
  *   VITE_API_BASE=http://localhost:8080/api
  * Fallback (dev default) is http://localhost:8080/api
  */
-export const API_BASE = import.meta.env?.VITE_API_BASE || 'http://localhost:8080/api';
-
+// For Vite
+export const API_BASE = import.meta.env?.VITE_API_BASE || 'http://192.168.1.46:8080/api';
 /* --------------------------- Basic Data Fetchers --------------------------- */
 export const getTracks = () => axios.get(`${API_BASE}/tracks`);
 export const getAlbums = () => axios.get(`${API_BASE}/albums`);
